@@ -44,6 +44,25 @@ class StockAverageDailySale(models.Model):
         help="The quantity delivered on average on one day for this product on "
         "the period. The spikes are excluded from the average computation.",
     )
+    average_daily_returns_count = fields.Float(
+        required=True,
+        digits="Product Unit of Measure",
+        help="How much returns on average for this product on the period. "
+        "The spikes are excluded from the average computation.",
+    )
+    average_qty_by_return = fields.Float(
+        required=True,
+        digits="Product Unit of Measure",
+        help="The quantity "
+        "returned on average for one return of this product on the period. "
+        "The spikes are excluded from the average computation.",
+    )
+    average_daily_return_qty = fields.Float(
+        digits="Product Unit of Measure",
+        required=True,
+        help="The quantity returned on average on one day for this product on "
+        "the period.",
+    )
     config_id = fields.Many2one(
         string="Stock Average Daily Sale Configuration",
         comodel_name="stock.average.daily.sale.config",
@@ -74,6 +93,14 @@ class StockAverageDailySale(models.Model):
         required=True,
         digits="Product Unit of Measure",
         help="Minimal recommended quantity in stock. Formula: average daily qty * number days in stock + safety",
+    )
+    recommended_qty_incl_returns = fields.Float(
+        required=True,
+        digits="Product Unit of Measure",
+        help=(
+            "Minimal recommended quantity in stock taking into account returns. "
+            "Formula: (average daily qty - average return qty) * number days in stock + safety"
+        ),
     )
     sale_ok = fields.Boolean(
         string="Can be Sold",
@@ -228,7 +255,38 @@ class StockAverageDailySale(models.Model):
                         AND coalesce(sm.warehouse_id, sl_src.warehouse_id) = cfg.warehouse_id
                     WINDOW pid AS (PARTITION BY sm.product_id, sm.warehouse_id)
                 ),
-
+                returns_last AS (
+                    SELECT
+                        sm.product_id,
+                        sm.product_uom_qty,
+                        sl_dest.warehouse_id,
+                        (avg(product_uom_qty) OVER pid
+                            - (stddev_samp(product_uom_qty) OVER pid * cfg.standard_deviation_exclude_factor)
+                        )  as lower_bound,
+                        (avg(product_uom_qty) OVER pid
+                            + ( stddev_samp(product_uom_qty) OVER pid * cfg.standard_deviation_exclude_factor)
+                        ) as upper_bound,
+                        coalesce ((stddev_samp(product_uom_qty) OVER pid), 0) as standard_deviation,
+                        cfg.nbr_days,
+                        cfg.date_from,
+                        cfg.date_to,
+                        cfg.exclude_weekends,
+                        cfg.id as config_id,
+                        sm.date
+                    FROM stock_move sm
+                        JOIN stock_location sl_src ON sm.location_id = sl_src.id
+                        JOIN stock_location sl_dest ON sm.location_dest_id = sl_dest.id
+                        JOIN product_product pp ON pp.id = sm.product_id
+                        JOIN product_template pt ON pp.product_tmpl_id = pt.id
+                        JOIN cfg ON cfg.abc_classification_level = coalesce(pt.abc_storage, 'c')
+                    WHERE
+                        sl_src.usage in ('inventory')
+                        AND sl_dest.usage in ('internal')
+                        AND sm.date BETWEEN cfg.date_from AND cfg.date_to
+                        AND sm.state = 'done'
+                        AND coalesce(sm.warehouse_id, sl_dest.warehouse_id) = cfg.warehouse_id
+                    WINDOW pid AS (PARTITION BY sm.product_id, sm.warehouse_id)
+                ),
                 averages AS(
                     SELECT
                         row_number() over (order by product_id) as id,
@@ -249,6 +307,28 @@ class StockAverageDailySale(models.Model):
                         config_id,
                         nbr_days
                     FROM deliveries_last
+                    GROUP BY product_id, warehouse_id, standard_deviation, nbr_days, date_from, date_to, config_id
+                ),
+                averages_return AS(
+                    SELECT
+                        row_number() over (order by product_id) as id,
+                        concat(warehouse_id, product_id)::integer as window_id,
+                        product_id,
+                        warehouse_id,
+                        (avg(product_uom_qty) FILTER
+                            (WHERE product_uom_qty BETWEEN lower_bound AND upper_bound OR standard_deviation = 0)
+                            )::numeric AS average_qty_by_return,
+                        (count(product_uom_qty) FILTER
+                            (WHERE product_uom_qty BETWEEN lower_bound AND upper_bound OR standard_deviation = 0)
+                            / nbr_days::numeric) AS average_daily_returns_count,
+                        count(product_uom_qty) FILTER
+                            (WHERE product_uom_qty BETWEEN lower_bound AND upper_bound OR standard_deviation = 0)::double precision as nbr_returns,
+                        standard_deviation::numeric AS ret_standard_deviation,
+                        date_from AS ret_date_from,
+                        date_to AS ret_date_to,
+                        config_id AS ret_config_id,
+                        nbr_days AS ret_nbr_days
+                    FROM returns_last
                     GROUP BY product_id, warehouse_id, standard_deviation, nbr_days, date_from, date_to, config_id
                 ),
                 -- Compute the stock by product in locations under stock
@@ -283,6 +363,28 @@ class StockAverageDailySale(models.Model):
                             GROUP BY product_id, warehouse_id, 1
                         ) as averages_daily group by id, product_id, warehouse_id
 
+                ),
+                -- Compute the standard deviation of the average daily returns count
+                daily_standard_deviation_return AS(
+                    SELECT
+                        id,
+                        product_id,
+                        warehouse_id,
+                        stddev_samp(daily_returns) as daily_standard_deviation
+                        from (
+                            SELECT
+                                to_char(date_trunc('day', date), 'YYYY-MM-DD'),
+                                concat(warehouse_id, product_id)::integer as id,
+                                product_id,
+                                warehouse_id,
+                                (count(product_uom_qty) FILTER
+                                    (WHERE product_uom_qty BETWEEN lower_bound AND upper_bound OR standard_deviation = 0)
+                                ) as daily_returns
+                            FROM returns_last
+                            WHERE exclude_weekends = False OR (EXTRACT(DOW FROM date) <> '0' AND EXTRACT(DOW FROM date) <> '6')
+                            GROUP BY product_id, warehouse_id, 1
+                        ) as averages_daily group by id, product_id, warehouse_id
+
                 )
 
                 -- Collect the data for the materialized view
@@ -293,6 +395,9 @@ class StockAverageDailySale(models.Model):
                         average_qty_by_sale,
                         average_daily_sales_count,
                         average_qty_by_sale * average_daily_sales_count as average_daily_qty,
+                        average_qty_by_return,
+                        average_daily_returns_count,
+                        average_qty_by_return * average_daily_returns_count as average_daily_return_qty,
                         nbr_sales,
                         standard_deviation,
                         date_from,
@@ -309,13 +414,19 @@ class StockAverageDailySale(models.Model):
                         GREATEST(
                             (cfg.number_days_qty_in_stock * average_qty_by_sale * average_daily_sales_count) + (ds.daily_standard_deviation * cfg.safety_factor * sqrt(nbr_days)),
                             (cfg.number_days_qty_in_stock *  average_qty_by_sale)
-                        ) as recommended_qty
+                        ) as recommended_qty,
+                        GREATEST(
+                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - average_qty_by_return) * (average_daily_sales_count - average_daily_returns_count)) + ((ds.daily_standard_deviation - dsr.daily_standard_deviation) * cfg.safety_factor * sqrt(nbr_days)),
+                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - average_qty_by_return))
+                        ) as recommended_qty_incl_returns
                     FROM averages t
                     JOIN daily_standard_deviation ds on ds.id= t.window_id
                     JOIN stock_average_daily_sale_config cfg on cfg.id = t.config_id
                     JOIN stock_qty sqty on sqty.pp_id = t.product_id AND t.warehouse_id = sqty.warehouse_id
                     JOIN product_product pp on pp.id = t.product_id
                     JOIN product_template pt on pt.id = pp.product_tmpl_id
+                    LEFT JOIN averages_return tr ON tr.window_id = t.window_id
+                    LEFT JOIN daily_standard_deviation_return dsr on dsr.id= t.window_id
                     ORDER BY product_id
                 ) WITH NO DATA;""",
             {
