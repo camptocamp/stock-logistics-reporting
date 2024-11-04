@@ -47,10 +47,14 @@
                 <field name="average_qty_by_sale" />
                 <field name="average_daily_sales_count" />
                 <field name="average_daily_qty" />
+                <field name="average_qty_by_return" optional="hide" />
+                <field name="average_daily_returns_count" optional="hide" />
+                <field name="average_daily_return_qty" optional="show" />
                 <field name="standard_deviation" />
                 <field name="daily_standard_deviation" />
                 <field name="safety" />
                 <field name="recommended_qty" />
+                <field name="recommended_qty_incl_returns" optional="show" />
                 <field name="nbr_sales" />
                 <field name="qty_in_stock" />
                 <field name="date_from" />
