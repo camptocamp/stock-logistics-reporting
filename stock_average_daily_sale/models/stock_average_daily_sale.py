@@ -232,18 +232,10 @@ class StockAverageDailySale(models.Model):
                         sm.product_id AS ret_product_id,
                         sm.product_uom_qty AS ret_product_uom_qty,
                         sl_src.warehouse_id AS ret_warehouse_id,
-                        (avg(product_uom_qty) OVER pid
-                            - (stddev_samp(product_uom_qty) OVER pid * cfg.standard_deviation_exclude_factor)
-                        ) AS ret_lower_bound,
-                        (avg(product_uom_qty) OVER pid
-                            + (stddev_samp(product_uom_qty) OVER pid * cfg.standard_deviation_exclude_factor)
-                        ) AS ret_upper_bound,
                         coalesce ((stddev_samp(product_uom_qty) OVER pid), 0) AS ret_standard_deviation,
                         cfg.nbr_days AS ret_nbr_days,
                         cfg.date_from AS ret_date_from,
                         cfg.date_to AS ret_date_to,
-                        cfg.exclude_weekends AS ret_exclude_weekends,
-                        cfg.id AS retconfig_id,
                         sm.date AS ret_date
                     FROM stock_move sm
                         JOIN stock_location sl_src ON sm.location_id = sl_src.id
@@ -280,7 +272,15 @@ class StockAverageDailySale(models.Model):
                         config_id,
                         nbr_days
                     FROM deliveries_last
-                    LEFT JOIN returns_last ON deliveries_last.product_id = returns_last.ret_product_id
+                    LEFT JOIN returns_last
+                    ON
+                        deliveries_last.product_id = returns_last.ret_product_id
+                        AND
+                        deliveries_last.warehouse_id = returns_last.ret_warehouse_id
+                        AND
+                        deliveries_last.date_from = returns_last.ret_date_from
+                        AND
+                        deliveries_last.date_to = returns_last.ret_date_to
                     GROUP BY product_id, warehouse_id, standard_deviation, nbr_days, date_from, date_to, config_id
                 ),
                 -- Compute the stock by product in locations under stock
