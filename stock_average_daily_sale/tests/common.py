@@ -104,12 +104,15 @@ class CommonAverageSaleTest:
 
     @classmethod
     def _create_move(cls, product, origin_location, qty, dest_location=None):
+        warehouse = origin_location.warehouse_id
+        if not warehouse and dest_location:
+            warehouse = dest_location.warehouse_id
         move = cls.move_obj.create(
             {
                 "product_id": product.id,
                 "name": product.name,
                 "location_id": origin_location.id,
-                "warehouse_id": origin_location.warehouse_id.id,
+                "warehouse_id": warehouse.id,
                 "location_dest_id": dest_location.id
                 if dest_location
                 else cls.customers.id,
