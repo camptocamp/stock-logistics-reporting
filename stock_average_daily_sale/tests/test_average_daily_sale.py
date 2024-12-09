@@ -61,6 +61,9 @@ class TestAverageSale(CommonAverageSaleTest, SavepointCase):
                     "average_qty_by_sale": 10.0,
                     "qty_in_stock": 40.0,
                     "recommended_qty": 20.0,
+                    "average_qty_by_return": 0.0,
+                    "average_daily_returns_count": 0.0,
+                    "recommended_qty_incl_returns": 20.0,
                     "warehouse_id": self.warehouse_0.id,
                 }
             ],
@@ -76,6 +79,7 @@ class TestAverageSale(CommonAverageSaleTest, SavepointCase):
                     "average_qty_by_sale": 12.0,
                     "qty_in_stock": 48.0,
                     "recommended_qty": 24.0,
+                    "recommended_qty_incl_returns": 24.0,
                     "warehouse_id": self.warehouse_0.id,
                 }
             ],
@@ -153,6 +157,7 @@ class TestAverageSale(CommonAverageSaleTest, SavepointCase):
                     "nbr_sales": 2.0,
                     "average_qty_by_sale": 8.0,
                     "recommended_qty": 16.0,
+                    "recommended_qty_incl_returns": 16.0,
                     "qty_in_stock": 44.0,
                     "warehouse_id": self.warehouse_0.id,
                 }
