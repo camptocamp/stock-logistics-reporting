@@ -92,14 +92,21 @@ class StockAverageDailySale(models.Model):
     recommended_qty = fields.Float(
         required=True,
         digits="Product Unit of Measure",
-        help="Minimal recommended quantity in stock. Formula: average daily qty * number days in stock + safety",
+        help=(
+            "Recommended minimal quantity in stock. The bigger of the two values of:\n"
+            "I) number of days in stock * average daily quantity * average daily consumption count\n"
+            "II) number of days in stock * average quantity by consumption"
+        ),
     )
     recommended_qty_incl_returns = fields.Float(
         required=True,
         digits="Product Unit of Measure",
         help=(
-            "Minimal recommended quantity in stock taking into account returns. "
-            "Formula: (average daily qty - average return qty) * number days in stock + safety"
+            "Recommended minimal quantity in stock taking into account returns. "
+            "The bigger of the two values of:\n"
+            "I) number of days in stock * (average daily quantity - average daily return quantity) "
+            "* (average daily consumption count - average daily returns count)\n"
+            "II) number of days in stock * (average quantity by consumption - average quantity by return)"
         ),
     )
     sale_ok = fields.Boolean(
