@@ -416,8 +416,8 @@ class StockAverageDailySale(models.Model):
                             (cfg.number_days_qty_in_stock *  average_qty_by_sale)
                         ) as recommended_qty,
                         GREATEST(
-                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - average_qty_by_return) * (average_daily_sales_count - average_daily_returns_count)) + ((ds.daily_standard_deviation - dsr.daily_standard_deviation) * cfg.safety_factor * sqrt(nbr_days)),
-                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - average_qty_by_return))
+                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - COALESCE(average_qty_by_return, 0)) * (average_daily_sales_count - COALESCE(average_daily_returns_count, 0))) + ((ds.daily_standard_deviation - COALESCE(dsr.daily_standard_deviation, 0)) * cfg.safety_factor * sqrt(nbr_days)),
+                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - COALESCE(average_qty_by_return, 0)))
                         ) as recommended_qty_incl_returns
                     FROM averages t
                     JOIN daily_standard_deviation ds on ds.id= t.window_id
