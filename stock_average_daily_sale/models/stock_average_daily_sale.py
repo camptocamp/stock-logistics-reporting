@@ -312,7 +312,7 @@ class StockAverageDailySale(models.Model):
                 averages_return AS(
                     SELECT
                         row_number() over (order by product_id) as id,
-                        concat(warehouse_id, product_id)::integer as window_id,
+                        concat(warehouse_id, '-', product_id) as window_id,
                         product_id,
                         warehouse_id,
                         (avg(product_uom_qty) FILTER
@@ -374,7 +374,7 @@ class StockAverageDailySale(models.Model):
                         from (
                             SELECT
                                 to_char(date_trunc('day', date), 'YYYY-MM-DD'),
-                                concat(warehouse_id, product_id)::integer as id,
+                                concat(warehouse_id, '-', product_id) as id,
                                 product_id,
                                 warehouse_id,
                                 (count(product_uom_qty) FILTER
