@@ -212,6 +212,8 @@ class StockAverageDailySale(models.Model):
                         ) AS nbr_days
                     FROM
                         stock_average_daily_sale_config
+                    WHERE
+                        active = True
                 ),
                 -- Create a consolidated view of all the stock moves from internal locations
                 -- to customer location. The consolidation is done by including all the moves

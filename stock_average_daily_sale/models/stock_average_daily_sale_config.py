@@ -13,6 +13,7 @@ class StockAverageDailySaleConfig(models.Model):
     _description = "Average daily sales computation parameters"
     check_company_auto = True
 
+    active = fields.Boolean(default=True)
     abc_classification_level = fields.Selection(
         selection=ABC_SELECTION, required=True, default="b"
     )
