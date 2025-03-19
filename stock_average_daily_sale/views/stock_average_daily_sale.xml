@@ -56,6 +56,7 @@
                 <field name="recommended_qty" />
                 <field name="recommended_qty_incl_returns" optional="show" />
                 <field name="nbr_sales" />
+                <field name="nbr_returns" optional="hide" />
                 <field name="qty_in_stock" />
                 <field name="date_from" />
                 <field name="date_to" />

@@ -81,6 +81,11 @@ class StockAverageDailySale(models.Model):
         required=True,
         help="The total amount of deliveries for this product over the complete period",
     )
+    nbr_returns = fields.Integer(
+        string="Number of Returns",
+        required=True,
+        help="The total amount of returns for this product over the complete period",
+    )
     product_id = fields.Many2one(
         comodel_name="product.product", string="Product", required=True, index=True
     )
@@ -401,6 +406,7 @@ class StockAverageDailySale(models.Model):
                         average_daily_returns_count,
                         average_qty_by_return * average_daily_returns_count as average_daily_return_qty,
                         nbr_sales,
+                        nbr_returns,
                         standard_deviation,
                         date_from,
                         date_to,
@@ -418,7 +424,9 @@ class StockAverageDailySale(models.Model):
                             (cfg.number_days_qty_in_stock *  average_qty_by_sale)
                         ) as recommended_qty,
                         GREATEST(
-                            (cfg.number_days_qty_in_stock * (average_qty_by_sale - COALESCE(average_qty_by_return, 0)) * (average_daily_sales_count - COALESCE(average_daily_returns_count, 0))) + ((ds.daily_standard_deviation - COALESCE(dsr.daily_standard_deviation, 0)) * cfg.safety_factor * sqrt(nbr_days)),
+                            (cfg.number_days_qty_in_stock * (
+                                average_qty_by_sale * average_daily_sales_count - COALESCE(average_qty_by_return, 0) * COALESCE(average_daily_returns_count, 0)
+                            ) + ((ds.daily_standard_deviation - COALESCE(dsr.daily_standard_deviation, 0)) * cfg.safety_factor * sqrt(nbr_days))),
                             (cfg.number_days_qty_in_stock * (average_qty_by_sale - COALESCE(average_qty_by_return, 0)))
                         ) as recommended_qty_incl_returns
                     FROM averages t
