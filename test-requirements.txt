@@ -1,1 +1,3 @@
 odoo-test-helper
+
+odoo-addon-printing_auto_base @ git+https://github.com/OCA/report-print-send@refs/pull/410/head#subdirectory=printing_auto_base
