@@ -102,12 +102,12 @@ msgstr ""
 #. module: stock_account_valuation_report
 #: model:ir.model.fields,field_description:stock_account_valuation_report.field_product_product__qty_at_date
 msgid "Inventory Quantity"
-msgstr ""
+msgstr "Lagermenge (Stichtag)"
 
 #. module: stock_account_valuation_report
 #: model:ir.model.fields,field_description:stock_account_valuation_report.field_product_product__stock_value
 msgid "Inventory Value"
-msgstr ""
+msgstr "Lagerwert (Stichtag)"
 
 #. module: stock_account_valuation_report
 #: model:ir.model,name:stock_account_valuation_report.model_account_move_line
